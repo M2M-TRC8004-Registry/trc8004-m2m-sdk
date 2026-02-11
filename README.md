@@ -46,6 +46,7 @@ pip install -e .[dev]
 | EnhancedIdentityRegistry | [`TYmmnmgkxteBvH8u8LAfb8sCcs1Eph2tk2`](https://tronscan.org/#/contract/TYmmnmgkxteBvH8u8LAfb8sCcs1Eph2tk2) |
 | ValidationRegistry | [`TY9sqKiWBhZP6aMdjarcViyD2cudMAGfGn`](https://tronscan.org/#/contract/TY9sqKiWBhZP6aMdjarcViyD2cudMAGfGn) |
 | ReputationRegistry | [`TU8PmqF3mZoEGE97Se5oSgNo6bUs4VrswB`](https://tronscan.org/#/contract/TU8PmqF3mZoEGE97Se5oSgNo6bUs4VrswB) |
+| M2M TRC20 Token | [`TSH8XLQRMrCTTdCr3rUH2zUiuDZQjfmHaX`](https://tronscan.org/#/contract/TSH8XLQRMrCTTdCr3rUH2zUiuDZQjfmHaX) |
 
 ### Shasta Testnet
 | Contract | Address |
