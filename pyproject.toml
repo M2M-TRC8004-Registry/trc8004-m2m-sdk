@@ -1,0 +1,64 @@
+[project]
+name = "trc8004-m2m"
+version = "1.2.3"
+description = "TRC-8004 Machine-to-Machine Agent Registry SDK for TRON"
+authors = [
+    {name = "TRC-8004 Contributors"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["tron", "blockchain", "agent", "registry", "trc8004", "m2m"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "tronpy>=0.4.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+    "pycryptodome>=3.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "black>=24.0.0",
+    "mypy>=1.8.0",
+    "ruff>=0.2.0",
+]
+
+[project.urls]
+Homepage = "https://m2mregistry.io"
+Documentation = "https://m2mregistry.io/docs"
+Repository = "https://github.com/M2M-TRC8004-Registry/trc8004-m2m-sdk"
+"Bug Tracker" = "https://github.com/M2M-TRC8004-Registry/trc8004-m2m-sdk/issues"
+PyPI = "https://pypi.org/project/trc8004-m2m/"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["trc8004_m2m*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
