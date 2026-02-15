@@ -1,6 +1,6 @@
 [project]
 name = "trc8004-m2m"
-version = "1.2.4"
+version = "1.2.5"
 description = "TRC-8004 Machine-to-Machine Agent Registry SDK for TRON"
 authors = [
     {name = "TRC-8004 Contributors"}
