@@ -12,6 +12,7 @@ Python SDK for the TRC-8004 Machine-to-Machine Agent Registry on TRON blockchain
 - **Fast Search** — Query agents by skills, tags, reputation via API
 - **Validation Workflows** — Submit, complete, reject, and cancel validation requests
 - **Reputation Management** — Sentiment-based feedback (Positive / Neutral / Negative)
+- **Incident Reporting** — Report, respond to, and resolve agent incidents on-chain
 - **Agent-to-Agent Communication** — Agent Protocol client for inter-agent interaction
 - **IPFS Storage** — Automatic metadata upload and retrieval with multi-gateway fallback
 - **Hybrid Architecture** — Blockchain for trust, API for performance
@@ -43,17 +44,19 @@ pip install -e .[dev]
 ### Mainnet
 | Contract | Address |
 |----------|---------|
-| EnhancedIdentityRegistry | [`TYmmnmgkxteBvH8u8LAfb8sCcs1Eph2tk2`](https://tronscan.org/#/contract/TYmmnmgkxteBvH8u8LAfb8sCcs1Eph2tk2) |
-| ValidationRegistry | [`TY9sqKiWBhZP6aMdjarcViyD2cudMAGfGn`](https://tronscan.org/#/contract/TY9sqKiWBhZP6aMdjarcViyD2cudMAGfGn) |
-| ReputationRegistry | [`TU8PmqF3mZoEGE97Se5oSgNo6bUs4VrswB`](https://tronscan.org/#/contract/TU8PmqF3mZoEGE97Se5oSgNo6bUs4VrswB) |
+| EnhancedIdentityRegistry | [`THmfi8uJuUpTfUmYLDX7UD1KaE4P6HKgqA`](https://tronscan.org/#/contract/THmfi8uJuUpTfUmYLDX7UD1KaE4P6HKgqA) |
+| ValidationRegistry | [`TCoJA4BYXWZhp5eanCchMw67VA83tQ83n1`](https://tronscan.org/#/contract/TCoJA4BYXWZhp5eanCchMw67VA83tQ83n1) |
+| ReputationRegistry | [`TV8KWmp8qcj55sjs1NSjVxmRmZP7CYzNxH`](https://tronscan.org/#/contract/TV8KWmp8qcj55sjs1NSjVxmRmZP7CYzNxH) |
+| IncidentRegistry | [`TJ26Pu24ar7Qdh9Bm6tbBVdtzCJkbxS5eR`](https://tronscan.org/#/contract/TJ26Pu24ar7Qdh9Bm6tbBVdtzCJkbxS5eR) |
 | M2M TRC20 Token | [`TSH8XLQRMrCTTdCr3rUH2zUiuDZQjfmHaX`](https://tronscan.org/#/contract/TSH8XLQRMrCTTdCr3rUH2zUiuDZQjfmHaX) |
 
 ### Shasta Testnet
 | Contract | Address |
 |----------|---------|
-| EnhancedIdentityRegistry | [`TUf5fAgpLrR6YM3P9oX9GNG1tGV3VcyPE3`](https://shasta.tronscan.org/#/contract/TUf5fAgpLrR6YM3P9oX9GNG1tGV3VcyPE3) |
-| ValidationRegistry | [`TJXVDV7hpsTSSz3QBCJdw99eFvTWUjxph6`](https://shasta.tronscan.org/#/contract/TJXVDV7hpsTSSz3QBCJdw99eFvTWUjxph6) |
-| ReputationRegistry | [`TN5FBfXASyxrjUa9V73Hfme2pY9yWh6Rsh`](https://shasta.tronscan.org/#/contract/TN5FBfXASyxrjUa9V73Hfme2pY9yWh6Rsh) |
+| EnhancedIdentityRegistry | [`TFKNqk9bjwWp5uRiiGimqfLhVQB8jSxYi7`](https://shasta.tronscan.org/#/contract/TFKNqk9bjwWp5uRiiGimqfLhVQB8jSxYi7) |
+| ValidationRegistry | [`TPgGWWyUdxNryUCN49TdT4b3F4WB3Edr16`](https://shasta.tronscan.org/#/contract/TPgGWWyUdxNryUCN49TdT4b3F4WB3Edr16) |
+| ReputationRegistry | [`TRaYogyr2qc7WgsmuVF5Js39aCmoG7vZrA`](https://shasta.tronscan.org/#/contract/TRaYogyr2qc7WgsmuVF5Js39aCmoG7vZrA) |
+| IncidentRegistry | [`TPB59NFdypBpkJtWH7yE8XenKrdT1Q4g4s`](https://shasta.tronscan.org/#/contract/TPB59NFdypBpkJtWH7yE8XenKrdT1Q4g4s) |
 
 See the [smart-contracts repo](https://github.com/M2M-TRC8004-Registry/smart-contracts) for contract source code and ABIs.
 
@@ -65,12 +68,12 @@ See the [smart-contracts repo](https://github.com/M2M-TRC8004-Registry/smart-con
 from trc8004_m2m import AgentRegistry
 
 # Read-only (no private key needed)
-registry = AgentRegistry(network="shasta")
+registry = AgentRegistry(network="mainnet")  # or "shasta", "nile"
 
 # With private key (for write operations)
 registry = AgentRegistry(
     private_key="your_hex_private_key",
-    network="shasta"  # or "mainnet", "nile"
+    network="mainnet"  # or "shasta", "nile"
 )
 ```
 
@@ -160,6 +163,16 @@ tx = await registry.give_feedback(
     agent_id=123,
     feedback_text="Excellent execution speed and reliability",
     sentiment="positive"
+)
+```
+
+### Report an Incident
+
+```python
+tx = await registry.report_incident(
+    agent_id=123,
+    incident_uri="ipfs://QmIncident...",
+    category="performance"
 )
 ```
 

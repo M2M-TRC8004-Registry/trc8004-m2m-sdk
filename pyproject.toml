@@ -1,6 +1,6 @@
 [project]
 name = "trc8004-m2m"
-version = "1.2.3"
+version = "1.2.4"
 description = "TRC-8004 Machine-to-Machine Agent Registry SDK for TRON"
 authors = [
     {name = "TRC-8004 Contributors"}
@@ -39,7 +39,6 @@ Homepage = "https://m2mregistry.io"
 Documentation = "https://m2mregistry.io/docs"
 Repository = "https://github.com/M2M-TRC8004-Registry/trc8004-m2m-sdk"
 "Bug Tracker" = "https://github.com/M2M-TRC8004-Registry/trc8004-m2m-sdk/issues"
-PyPI = "https://pypi.org/project/trc8004-m2m/"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

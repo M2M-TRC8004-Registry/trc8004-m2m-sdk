@@ -38,7 +38,7 @@ from .exceptions import (
     ValidationError,
 )
 
-__version__ = "1.2.3"
+__version__ = "1.2.4"
 __author__ = "TRC-8004-M2M Contributors"
 
 __all__ = [

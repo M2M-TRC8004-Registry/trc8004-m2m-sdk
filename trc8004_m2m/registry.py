@@ -1,15 +1,19 @@
 """
-TRC-8004-M2M Agent Registry SDK
+TRC-8004-M2M Agent Registry SDK (v2)
 
 Main entry point for the SDK. Provides unified interface to:
 - TRON blockchain contracts (write operations)
 - REST API backend (fast read operations)
 - IPFS storage (metadata)
 
-Contract alignment:
-- EnhancedIdentityRegistry: register, exists, ownerOf, tokenURI, setAgentWallet
-- ValidationRegistry: validationRequest, completeValidation, rejectValidation, cancelRequest
-- ReputationRegistry: giveFeedback (sentiment-based), revokeFeedback, appendResponse
+v2 Contract alignment (ERC-8004 compatible superset):
+- EnhancedIdentityRegistry: register (overloads), setAgentURI, setMetadata,
+  setAgentWallet (signed+legacy), unsetAgentWallet, deactivate/reactivate
+- ValidationRegistry: validationRequest, completeValidation (with tag+response),
+  rejectValidation, cancelRequest
+- ReputationRegistry: giveFeedback (with value/tags/URI), revokeFeedback,
+  appendResponse (with URI/hash)
+- IncidentRegistry: reportIncident, respondToIncident, resolveIncident (NEW)
 """
 
 import logging
@@ -28,7 +32,7 @@ logger = logging.getLogger("trc8004_m2m")
 
 class AgentRegistry:
     """
-    Unified interface to TRON Agent Registry.
+    Unified interface to TRON Agent Registry (v2).
 
     Handles both on-chain (contracts) and off-chain (API) operations.
 
@@ -49,6 +53,9 @@ class AgentRegistry:
 
         # Search agents (fast API query)
         agents = await registry.search_agents(query="trading")
+
+        # Report incident (v2)
+        await registry.report_incident(agent_id, uri, hash, "failure")
     """
 
     def __init__(
@@ -59,31 +66,22 @@ class AgentRegistry:
         identity_address: Optional[str] = None,
         validation_address: Optional[str] = None,
         reputation_address: Optional[str] = None,
+        incident_address: Optional[str] = None,
     ):
-        """
-        Initialize the Agent Registry SDK.
-
-        Args:
-            private_key: TRON private key for write operations (optional for read-only)
-            network: TRON network ("mainnet", "shasta", "nile")
-            api_url: Backend API URL for fast queries
-            identity_address: EnhancedIdentityRegistry contract address
-            validation_address: ValidationRegistry contract address
-            reputation_address: ReputationRegistry contract address
-        """
         self.chain = TronClient(
             private_key=private_key,
             network=network,
             identity_address=identity_address,
             validation_address=validation_address,
             reputation_address=reputation_address,
+            incident_address=incident_address,
         )
 
         api_base = api_url or self._default_api_url(network)
         self.api = RegistryAPI(api_base)
         self.storage = IPFSStorage()
 
-        logger.info(f"AgentRegistry initialized: network={network}, api={api_base}")
+        logger.info(f"AgentRegistry v2 initialized: network={network}, api={api_base}")
 
     async def close(self):
         """Close all connections."""
@@ -112,19 +110,7 @@ class AgentRegistry:
         3. Computes metadata hash (keccak256)
         4. Calls IdentityRegistry.register(uri, metadataHash)
         5. Parses agent_id from transaction events
-
-        Args:
-            name: Agent name
-            description: Agent description
-            skills: List of skill dicts
-            endpoints: List of endpoint dicts
-            tags: Search tags
-            version: Agent version
-
-        Returns:
-            agent_id (on-chain NFT token ID)
         """
-        # Build metadata
         metadata = {
             "name": name,
             "description": description,
@@ -135,42 +121,52 @@ class AgentRegistry:
             **kwargs,
         }
 
-        # Upload to IPFS
         token_uri = await self.api.upload_to_ipfs(metadata)
-
-        # Compute metadata hash
         metadata_hash = keccak256_bytes(canonical_json(metadata))
-
-        # Register on-chain
         tx_id = await self.chain.register_agent(token_uri, metadata_hash)
 
-        # Parse agent_id from events
-        # Note: May need to wait for confirmation
         logger.info(f"Agent registration tx: {tx_id}")
 
-        # Trigger API sync
         try:
             await self.api.sync_agent(tx_id)
         except Exception:
-            pass  # Non-critical
+            pass
 
         return tx_id
 
+    async def register_agent_simple(self) -> str:
+        """Register a blank agent (ERC-8004 no-arg overload)."""
+        return await self.chain.register_agent_no_arg()
+
+    async def register_agent_uri(self, agent_uri: str) -> str:
+        """Register an agent with URI only (ERC-8004 URI-only overload)."""
+        return await self.chain.register_agent_uri(agent_uri)
+
     async def set_agent_wallet(self, agent_id: int, wallet: str) -> str:
-        """
-        Set delegated wallet for an agent.
-
-        Calls IdentityRegistry.setAgentWallet(agentId, wallet).
-        Only callable by agent owner.
-
-        Args:
-            agent_id: Agent token ID
-            wallet: Delegated wallet address
-
-        Returns:
-            Transaction ID
-        """
+        """Set delegated wallet for an agent (legacy)."""
         return await self.chain.set_agent_wallet(agent_id, wallet)
+
+    async def unset_agent_wallet(self, agent_id: int) -> str:
+        """Clear agent wallet (ERC-8004)."""
+        return await self.chain.unset_agent_wallet(agent_id)
+
+    async def set_agent_uri(self, agent_id: int, new_uri: str) -> str:
+        """Update agent URI post-registration (ERC-8004)."""
+        return await self.chain.set_agent_uri(agent_id, new_uri)
+
+    async def set_metadata(self, agent_id: int, key: str, value: bytes) -> str:
+        """Set per-key metadata (ERC-8004)."""
+        return await self.chain.set_metadata(agent_id, key, value)
+
+    async def deactivate_agent(self, agent_id: int) -> str:
+        """Deactivate an agent (TRC-8004 extension)."""
+        return await self.chain.deactivate_agent(agent_id)
+
+    async def reactivate_agent(self, agent_id: int) -> str:
+        """Reactivate an agent (TRC-8004 extension)."""
+        return await self.chain.reactivate_agent(agent_id)
+
+    # --- Validation ---
 
     async def submit_validation(
         self,
@@ -179,24 +175,11 @@ class AgentRegistry:
         request_uri: str,
         request_data: Optional[dict] = None,
     ) -> str:
-        """
-        Submit a validation request for an agent.
-
-        Calls ValidationRegistry.validationRequest(agentId, validator, requestURI, requestDataHash).
-
-        Args:
-            agent_id: Agent to validate
-            validator_address: Validator's TRON address
-            request_uri: URI pointing to request details
-            request_data: Optional data to hash for integrity check
-
-        Returns:
-            Transaction ID
-        """
+        """Submit a validation request for an agent."""
         if request_data:
             data_hash = keccak256_bytes(canonical_json(request_data))
         else:
-            data_hash = b"\x00" * 32  # Zero hash = auto-compute in contract
+            data_hash = b"\x00" * 32
 
         return await self.chain.validation_request(
             agent_id=agent_id,
@@ -210,20 +193,10 @@ class AgentRegistry:
         request_id: str,
         result_uri: str,
         result_data: Optional[dict] = None,
+        tag: str = "",
+        response: int = 100,
     ) -> str:
-        """
-        Complete a validation request (validators only).
-
-        Calls ValidationRegistry.completeValidation(requestId, resultURI, resultHash).
-
-        Args:
-            request_id: Validation request ID (hex string)
-            result_uri: URI pointing to result data
-            result_data: Optional data to hash for integrity check
-
-        Returns:
-            Transaction ID
-        """
+        """Complete a validation request (validators only)."""
         request_id_bytes = bytes.fromhex(request_id.replace("0x", ""))
 
         if result_data:
@@ -235,6 +208,8 @@ class AgentRegistry:
             request_id=request_id_bytes,
             result_uri=result_uri,
             result_hash=result_hash,
+            tag=tag,
+            response=response,
         )
 
     async def reject_validation(
@@ -242,20 +217,10 @@ class AgentRegistry:
         request_id: str,
         result_uri: str = "",
         reason_data: Optional[dict] = None,
+        tag: str = "",
+        response: int = 0,
     ) -> str:
-        """
-        Reject a validation request (validators only).
-
-        Calls ValidationRegistry.rejectValidation(requestId, resultURI, reasonHash).
-
-        Args:
-            request_id: Validation request ID (hex string)
-            result_uri: URI pointing to rejection reason
-            reason_data: Optional data to hash
-
-        Returns:
-            Transaction ID
-        """
+        """Reject a validation request (validators only)."""
         request_id_bytes = bytes.fromhex(request_id.replace("0x", ""))
 
         if reason_data:
@@ -267,62 +232,46 @@ class AgentRegistry:
             request_id=request_id_bytes,
             result_uri=result_uri,
             reason_hash=reason_hash,
+            tag=tag,
+            response=response,
         )
 
     async def cancel_validation(self, request_id: str) -> str:
-        """
-        Cancel a validation request (requesters only).
-
-        Calls ValidationRegistry.cancelRequest(requestId).
-
-        Args:
-            request_id: Validation request ID (hex string)
-
-        Returns:
-            Transaction ID
-        """
+        """Cancel a validation request (requesters only)."""
         request_id_bytes = bytes.fromhex(request_id.replace("0x", ""))
         return await self.chain.cancel_validation(request_id_bytes)
+
+    # --- Reputation ---
 
     async def give_feedback(
         self,
         agent_id: int,
         feedback_text: str,
         sentiment: str,
+        value: int = 0,
+        value_decimals: int = 0,
+        tag1: str = "",
+        tag2: str = "",
+        endpoint: str = "",
+        feedback_uri: str = "",
+        feedback_hash: bytes = b"\x00" * 32,
     ) -> str:
-        """
-        Submit reputation feedback for an agent.
-
-        Calls ReputationRegistry.giveFeedback(agentId, feedbackText, sentiment).
-
-        Args:
-            agent_id: Agent token ID
-            feedback_text: Feedback text (stored on-chain)
-            sentiment: "positive", "neutral", or "negative"
-
-        Returns:
-            Transaction ID
-        """
+        """Submit reputation feedback for an agent (v2: with ERC-8004 fields)."""
         return await self.chain.give_feedback(
             agent_id=agent_id,
             feedback_text=feedback_text,
             sentiment=sentiment,
+            value=value,
+            value_decimals=value_decimals,
+            tag1=tag1,
+            tag2=tag2,
+            endpoint=endpoint,
+            feedback_uri=feedback_uri,
+            feedback_hash=feedback_hash,
         )
 
     async def revoke_feedback(self, agent_id: int, feedback_index: int) -> str:
-        """
-        Revoke previously submitted feedback.
-
-        Calls ReputationRegistry.revokeFeedback(agentId, feedbackIndex).
-        Only callable by original feedback author.
-
-        Args:
-            agent_id: Agent token ID
-            feedback_index: Feedback index to revoke
-
-        Returns:
-            Transaction ID
-        """
+        """Revoke previously submitted feedback."""
         return await self.chain.revoke_feedback(agent_id, feedback_index)
 
     async def respond_to_feedback(
@@ -330,26 +279,53 @@ class AgentRegistry:
         agent_id: int,
         feedback_index: int,
         response_text: str,
+        client_address: str = "",
+        response_uri: str = "",
+        response_hash: bytes = b"\x00" * 32,
     ) -> str:
-        """
-        Respond to feedback as agent owner.
-
-        Calls ReputationRegistry.appendResponse(agentId, feedbackIndex, responseText).
-        Only callable by agent owner or delegated wallet.
-
-        Args:
-            agent_id: Agent token ID
-            feedback_index: Feedback index to respond to
-            response_text: Response text (stored on-chain)
-
-        Returns:
-            Transaction ID
-        """
+        """Respond to feedback as agent owner (v2: with ERC-8004 fields)."""
         return await self.chain.append_response(
             agent_id=agent_id,
             feedback_index=feedback_index,
             response_text=response_text,
+            client_address=client_address,
+            response_uri=response_uri,
+            response_hash=response_hash,
         )
+
+    # --- Incidents (v2 — NEW) ---
+
+    async def report_incident(
+        self,
+        agent_id: int,
+        incident_uri: str,
+        incident_hash: bytes,
+        category: str,
+    ) -> str:
+        """Report an incident against an agent."""
+        return await self.chain.report_incident(
+            agent_id=agent_id,
+            incident_uri=incident_uri,
+            incident_hash=incident_hash,
+            category=category,
+        )
+
+    async def respond_to_incident(
+        self,
+        incident_id: int,
+        response_uri: str,
+        response_hash: bytes,
+    ) -> str:
+        """Respond to an incident (agent owner/wallet only)."""
+        return await self.chain.respond_to_incident(
+            incident_id=incident_id,
+            response_uri=response_uri,
+            response_hash=response_hash,
+        )
+
+    async def resolve_incident(self, incident_id: int, resolution: str) -> str:
+        """Resolve an incident (reporter only)."""
+        return await self.chain.resolve_incident(incident_id, resolution)
 
     # ==========================================================================
     # READ OPERATIONS (API - Fast)
@@ -381,12 +357,16 @@ class AgentRegistry:
         )
 
     async def get_agent_reputation(self, agent_id: int) -> dict:
-        """Get detailed reputation stats (sentiment breakdown)."""
+        """Get detailed reputation stats (sentiment breakdown + value aggregates)."""
         return await self.api.get_reputation(agent_id)
 
     async def get_agent_validations(self, agent_id: int) -> List[dict]:
         """Get validation history."""
         return await self.api.get_validations(agent_id)
+
+    async def get_agent_incidents(self, agent_id: int) -> List[dict]:
+        """Get incident history (v2)."""
+        return await self.api.get_incidents(agent_id)
 
     async def get_stats(self) -> dict:
         """Get global registry statistics."""
@@ -403,6 +383,10 @@ class AgentRegistry:
     async def verify_agent_exists(self, agent_id: int) -> bool:
         """Check if agent exists on-chain."""
         return await self.chain.agent_exists(agent_id)
+
+    async def verify_agent_active(self, agent_id: int) -> bool:
+        """Check if agent is active on-chain (v2)."""
+        return await self.chain.is_active(agent_id)
 
     # ==========================================================================
     # Private helpers
